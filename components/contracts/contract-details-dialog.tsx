@@ -42,6 +42,10 @@ export function ContractDetailsDialog({
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(
     (contract as any).clientSignatureBase64 ?? null
   );
+  const [fuelAmount, setFuelAmount] = useState<number>(
+    (contract as any).fuelAmount ?? 0
+  );
+  const [savingFuel, setSavingFuel] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawing = useRef(false);
 
@@ -53,6 +57,7 @@ export function ContractDetailsDialog({
 
   useEffect(() => {
     setSignatureDataUrl((contract as any).clientSignatureBase64 ?? null);
+    setFuelAmount((contract as any).fuelAmount ?? 0);
   }, [contract]);
 
   const clearCanvas = () => {
@@ -171,6 +176,27 @@ export function ContractDetailsDialog({
     }
   };
 
+  const handleSaveFuel = async () => {
+    try {
+      setSavingFuel(true);
+      await updateContract(contract.id, {
+        fuelAmount,
+      } as any);
+      toast({
+        title: "Fuel updated",
+        description: "Fuel amount has been updated for this contract.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Could not update fuel",
+        description: err?.message ?? "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingFuel(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-h-[85vh] w-full sm:w-[90vw] max-w-2xl overflow-hidden px-6 py-6 sm:px-8 sm:py-7">
@@ -257,6 +283,44 @@ export function ContractDetailsDialog({
               <Badge className="mt-0.5">
                 {contract.status}
               </Badge>
+            </div>
+          </div>
+
+          <div className="space-y-2 rounded-md border bg-muted/40 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Fuel amount
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Set the current fuel level (bars)
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                  value={fuelAmount || 0}
+                  onChange={(e) => setFuelAmount(Number.parseInt(e.target.value, 10) || 0)}
+                >
+                  <option value={0}>0</option>
+                  {Array.from({ length: 12 }).map((_, idx) => {
+                    const v = idx + 1;
+                    return (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    );
+                  })}
+                </select>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveFuel}
+                  disabled={savingFuel}
+                >
+                  {savingFuel ? "Saving…" : "Save"}
+                </Button>
+              </div>
             </div>
           </div>
 
