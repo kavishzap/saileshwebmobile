@@ -278,7 +278,7 @@ export default function ContractsPlannerPage() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading planner…</p>
           ) : (
-            <div className="h-[450px] sm:h-[600px] lg:h-[700px] rounded-md border bg-background p-2">
+            <div className="h-[550px] sm:h-[700px] lg:h-[800px] rounded-md border bg-background p-2">
               <BigCalendar
                 localizer={localizer}
                 events={filteredEvents}
