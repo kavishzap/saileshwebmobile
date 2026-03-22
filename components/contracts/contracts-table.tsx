@@ -50,6 +50,7 @@ type ContractsTableProps = {
   contracts: Contract[];
   onEdit: (contract: Contract) => void;
   onDelete: (contract: Contract) => void | Promise<void>;
+  onContractUpdated?: () => void | Promise<void>;
 };
 
 const statusColors: Record<
@@ -79,6 +80,7 @@ export function ContractsTable({
   contracts,
   onEdit,
   onDelete,
+  onContractUpdated,
 }: ContractsTableProps) {
   const [rows, setRows] = useState<Enriched[]>([]);
   const [loading, setLoading] = useState(false);
@@ -108,6 +110,17 @@ export function ContractsTable({
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [totalPages, page]);
+
+  // Sync detailsContract when contracts refresh (e.g. after status save)
+  useEffect(() => {
+    if (!detailsContract || !detailsOpen) return;
+    const updated = contracts.find((c) => c.id === detailsContract.id);
+    if (updated) {
+      setDetailsContract((prev) =>
+        prev ? { ...prev, status: updated.status } : null
+      );
+    }
+  }, [contracts, detailsContract?.id, detailsOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -446,6 +459,7 @@ export function ContractsTable({
             setDetailsOpen(false);
             setDetailsContract(null);
           }}
+          onUpdated={onContractUpdated ? async () => { await onContractUpdated(); } : undefined}
         />
       )}
     </>

@@ -526,8 +526,8 @@ export function ContractDialog({
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
-      <DialogContent 
-        className="max-h-[85vh] w-full sm:w-[90vw] max-w-2xl overflow-hidden flex flex-col"
+      <DialogContent
+        className="max-h-[85vh] w-[95vw] sm:w-[90vw] max-w-2xl overflow-hidden flex flex-col mx-auto"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
@@ -960,17 +960,19 @@ export function ContractDialog({
               />
             </div>
 
-            <div className="space-y-2 md:col-span-2 xl:col-span-1">
+            <div className="space-y-2 md:col-span-2 xl:col-span-1 flex flex-col items-center sm:items-start">
               <Label>Client Signature</Label>
               {formData.clientSignatureBase64 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={formData.clientSignatureBase64}
-                  alt="Client signature"
-                  className="h-28 w-full rounded border bg-white object-contain p-2"
-                />
+                <div className="flex justify-center w-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={formData.clientSignatureBase64}
+                    alt="Client signature"
+                    className="h-28 max-w-full rounded border bg-white object-contain object-center p-2"
+                  />
+                </div>
               ) : (
-                <div className="h-28 w-full rounded border bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">
+                <div className="h-28 w-full max-w-xs rounded border bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">
                   No signature
                 </div>
               )}

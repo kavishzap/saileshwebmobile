@@ -12,8 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import type { Contract } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { updateContract } from "@/lib/services/contracts";
 import { useToast } from "@/hooks/use-toast";
+import type { ContractStatus } from "@/lib/types";
 
 type ContractDetails = Contract & {
   customerName?: string;
@@ -28,12 +36,14 @@ type ContractDetailsDialogProps = {
   open: boolean;
   contract: ContractDetails | null;
   onClose: () => void;
+  onUpdated?: () => void;
 };
 
 export function ContractDetailsDialog({
   open,
   contract,
   onClose,
+  onUpdated,
 }: ContractDetailsDialogProps) {
   if (!contract) return null;
 
@@ -46,6 +56,8 @@ export function ContractDetailsDialog({
     (contract as any).fuelAmount ?? 0
   );
   const [savingFuel, setSavingFuel] = useState(false);
+  const [status, setStatus] = useState<ContractStatus>(contract.status);
+  const [savingStatus, setSavingStatus] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawing = useRef(false);
 
@@ -58,6 +70,7 @@ export function ContractDetailsDialog({
   useEffect(() => {
     setSignatureDataUrl((contract as any).clientSignatureBase64 ?? null);
     setFuelAmount((contract as any).fuelAmount ?? 0);
+    setStatus(contract.status);
   }, [contract]);
 
   const clearCanvas = () => {
@@ -74,17 +87,22 @@ export function ContractDetailsDialog({
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
+    // Scale display coords to canvas internal coords (canvas may be scaled on mobile)
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
+    let displayX: number;
+    let displayY: number;
     if ("touches" in e && e.touches[0]) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
-      };
+      displayX = e.touches[0].clientX - rect.left;
+      displayY = e.touches[0].clientY - rect.top;
+    } else {
+      displayX = (e as React.MouseEvent).clientX - rect.left;
+      displayY = (e as React.MouseEvent).clientY - rect.top;
     }
-
     return {
-      x: (e as React.MouseEvent).clientX - rect.left,
-      y: (e as React.MouseEvent).clientY - rect.top,
+      x: displayX * scaleX,
+      y: displayY * scaleY,
     };
   };
 
@@ -197,16 +215,36 @@ export function ContractDetailsDialog({
     }
   };
 
+  const handleSaveStatus = async () => {
+    try {
+      setSavingStatus(true);
+      await updateContract(contract.id, { status } as any);
+      toast({
+        title: "Status updated",
+        description: "Contract status has been updated.",
+      });
+      onUpdated?.();
+    } catch (err: any) {
+      toast({
+        title: "Could not update status",
+        description: err?.message ?? "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[85vh] w-full sm:w-[90vw] max-w-2xl overflow-hidden px-6 py-6 sm:px-8 sm:py-7">
+      <DialogContent className="max-h-[85vh] w-[95vw] sm:w-[90vw] max-w-2xl overflow-hidden px-4 py-5 sm:px-8 sm:py-7 mx-auto">
         <DialogHeader>
           <DialogTitle>
             Contract {contract.contractNumber ?? ""} details
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1 w-full max-w-full">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <div className="text-xs font-medium text-muted-foreground">
@@ -276,13 +314,50 @@ export function ContractDetailsDialog({
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 md:col-span-2">
               <div className="text-xs font-medium text-muted-foreground">
                 Status
               </div>
               <Badge className="mt-0.5">
-                {contract.status}
+                {status}
               </Badge>
+            </div>
+          </div>
+
+          <div className="space-y-2 rounded-md border bg-muted/40 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Contract status
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Change and save the contract status
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={status}
+                  onValueChange={(value: ContractStatus) => setStatus(value)}
+                >
+                  <SelectTrigger className="h-9 w-[140px] sm:w-[160px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveStatus}
+                  disabled={savingStatus || status === contract.status}
+                >
+                  {savingStatus ? "Saving…" : "Save"}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -453,15 +528,17 @@ export function ContractDetailsDialog({
             </div>
 
             {signatureDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={signatureDataUrl}
-                alt="Client signature"
-                className="h-32 w-full rounded border bg-white object-contain p-2"
-              />
+              <div className="flex justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={signatureDataUrl}
+                  alt="Client signature"
+                  className="h-32 max-w-full rounded border bg-white object-contain object-center p-2"
+                />
+              </div>
             ) : (
-              <div className="space-y-2">
-                <div className="h-40 w-full rounded border bg-white touch-none">
+              <div className="space-y-2 flex flex-col items-center">
+                <div className="h-40 w-full max-w-md rounded border bg-white touch-none">
                   <canvas
                     ref={canvasRef}
                     className="h-full w-full"
@@ -476,7 +553,7 @@ export function ContractDetailsDialog({
                     onTouchEnd={handleCanvasUp}
                   />
                 </div>
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-2 w-full max-w-md">
                   <Button
                     type="button"
                     variant="outline"
