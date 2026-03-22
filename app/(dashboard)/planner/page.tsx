@@ -30,7 +30,7 @@ import {
   Views,
 } from "react-big-calendar";
 import { dateFnsLocalizer } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay } from "date-fns";
+import { format, parse, startOfWeek, getDay, addDays } from "date-fns";
 import { enGB } from "date-fns/locale/en-GB";
 
 const locales = {
@@ -52,6 +52,7 @@ type PlannerEvent = RBCEvent & {
   status: Contract["status"];
   carName?: string;
   customerName?: string;
+  isTerminating?: boolean;
 };
 
 export default function ContractsPlannerPage() {
@@ -131,30 +132,56 @@ export default function ContractsPlannerPage() {
 
   // Build calendar events (exclude cancelled contracts)
   const events: PlannerEvent[] = useMemo(() => {
-    return contracts
+    const result: PlannerEvent[] = [];
+
+    contracts
       .filter((c) => c.status !== "cancelled")
-      .map((c) => {
-      const start = new Date(c.startDate);
-      const end = new Date(c.endDate);
-      // react-big-calendar treats end as exclusive, so +1 day for all-day style
-      end.setDate(end.getDate());
+      .forEach((c) => {
+        const start = new Date(c.startDate);
+        const end = new Date(c.endDate);
+        // react-big-calendar treats end as exclusive, so +1 day for all-day style
+        end.setDate(end.getDate());
 
-       const carLabel = getCarLabel(c.carId);
-      const customerName = getCustomerName(c.customerId);
+        const carLabel = getCarLabel(c.carId);
+        const customerName = getCustomerName(c.customerId);
 
-      return {
-        contractId: c.id,
-        carId: c.carId,
-        customerId: c.customerId,
-        status: c.status,
-        carLabel,
-        customerName,
-        title: `${carLabel} – ${customerName}`,
-        start,
-        end,
-        allDay: true,
-      };
-    });
+        // Main rental event
+        result.push({
+          contractId: c.id,
+          carId: c.carId,
+          customerId: c.customerId,
+          status: c.status,
+          carLabel,
+          customerName,
+          title: `${carLabel} – ${customerName}`,
+          start,
+          end: addDays(new Date(c.endDate), 1),
+          allDay: true,
+        });
+
+        // "Terminating" indicator on the end date (skip for same-day contracts)
+        const startDateOnly = new Date(c.startDate);
+        startDateOnly.setHours(0, 0, 0, 0);
+        const endDateOnly = new Date(c.endDate);
+        endDateOnly.setHours(0, 0, 0, 0);
+        if (startDateOnly.getTime() !== endDateOnly.getTime()) {
+          result.push({
+            contractId: c.id,
+            carId: c.carId,
+            customerId: c.customerId,
+            status: c.status,
+            carLabel,
+            customerName,
+            title: "↳ Terminating",
+            start: endDateOnly,
+            end: addDays(endDateOnly, 1),
+            allDay: true,
+            isTerminating: true,
+          });
+        }
+      });
+
+    return result;
   }, [contracts, cars, customers]);
 
   // Apply filters (by car)
@@ -164,6 +191,27 @@ export default function ContractsPlannerPage() {
       return true;
     });
   }, [events, selectedCarId]);
+
+  // Contracts terminating in the currently viewed month
+  const terminatingThisMonth = useMemo(() => {
+    const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+    return contracts
+      .filter((c) => c.status !== "cancelled")
+      .filter((c) => {
+        if (selectedCarId !== "all" && c.carId !== selectedCarId) return false;
+        const endDate = new Date(c.endDate);
+        return endDate >= monthStart && endDate <= monthEnd;
+      })
+      .map((c) => ({
+        contract: c,
+        endDate: new Date(c.endDate),
+        carLabel: getCarLabel(c.carId),
+        customerName: getCustomerName(c.customerId),
+      }))
+      .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
+  }, [contracts, cars, customers, currentDate, selectedCarId]);
 
   // Generate a consistent color for each contract
   const getContractColor = (contractId: string): string => {
@@ -197,15 +245,19 @@ export default function ContractsPlannerPage() {
 
   // Event styling
   const eventPropGetter = (event: PlannerEvent) => {
-    const backgroundColor = getContractColor(event.contractId);
+    const isTerminating = event.isTerminating;
+    const backgroundColor = isTerminating
+      ? "#f59e0b" // amber for terminating
+      : getContractColor(event.contractId);
     return {
       style: {
         backgroundColor,
         borderRadius: "6px",
-        border: "none",
+        border: isTerminating ? "2px dashed rgba(255,255,255,0.9)" : "none",
         color: "white",
-        fontSize: "0.75rem",
+        fontSize: isTerminating ? "0.7rem" : "0.75rem",
         padding: "2px 4px",
+        fontWeight: isTerminating ? 600 : undefined,
       },
     };
   };
@@ -272,6 +324,36 @@ export default function ContractsPlannerPage() {
       />
 
       <div className="px-3 sm:px-6 space-y-4">
+        {!loading && terminatingThisMonth.length > 0 && (
+          <Card>
+            <CardContent className="pt-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">
+                Contracts terminating in {format(currentDate, "MMMM yyyy")}
+              </h3>
+              <ul className="space-y-2">
+                {terminatingThisMonth.map(({ contract, endDate, carLabel, customerName }) => (
+                  <li
+                    key={contract.id}
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm py-1.5 px-3 rounded-md bg-amber-500/10 border border-amber-500/20"
+                  >
+                    <span className="font-medium">
+                      {carLabel} – {customerName}
+                    </span>
+                    <span className="text-muted-foreground">
+                      ends {format(endDate, "EEEE d MMM yyyy")}
+                    </span>
+                    {contract.contractNumber && (
+                      <span className="text-xs text-muted-foreground">
+                        ({contract.contractNumber})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
 
         <CardContent>
