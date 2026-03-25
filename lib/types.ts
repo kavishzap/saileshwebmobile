@@ -67,7 +67,8 @@ export interface Contract {
   contractNumber: string;
 
   customerId: string;
-  carId: string;
+  /** Null when the contract has no vehicle assigned yet. */
+  carId: string | null;
 
   startDate: string; // ISO string
   endDate: string; // ISO string

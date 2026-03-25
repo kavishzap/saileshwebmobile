@@ -47,7 +47,10 @@ export async function getCars(): Promise<Car[]> {
   return (data ?? []).map(mapFromDb);
 }
 
-export async function getCarById(id: string): Promise<Car | null> {
+export async function getCarById(
+  id: string | null | undefined
+): Promise<Car | null> {
+  if (id == null || id === "") return null;
   const { data, error } = await supabase
     .from("cars")
     .select("*")

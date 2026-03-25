@@ -42,7 +42,10 @@ export async function getCustomers(): Promise<Customer[]> {
   return (data ?? []).map(mapFromDb);
 }
 
-export async function getCustomerById(id: string): Promise<Customer | null> {
+export async function getCustomerById(
+  id: string | null | undefined
+): Promise<Customer | null> {
+  if (id == null || id === "") return null;
   const { data, error } = await supabase
     .from("customers")
     .select("*")

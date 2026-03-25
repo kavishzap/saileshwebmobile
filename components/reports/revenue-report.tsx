@@ -56,7 +56,11 @@ export function RevenueReport({ dateRange }: RevenueReportProps) {
               return {
                 ...contract,
                 customerName: customer ? `${customer.firstName} ${customer.lastName}` : "Unknown",
-                carName: car?.name ?? "Unknown",
+                carName: car
+                  ? car.name
+                  : contract.carId
+                    ? "Unknown"
+                    : "No vehicle",
                 carPlateNumber: car?.plateNumber ?? "",
               };
             })

@@ -66,7 +66,10 @@ export default function ReportsPage() {
 
         // Utilization: distinct cars that currently have an ACTIVE contract / total cars
         const activeCarIds = new Set(
-          contracts.filter((c) => c.status === "active").map((c) => c.carId)
+          contracts
+            .filter((c) => c.status === "active")
+            .map((c) => c.carId)
+            .filter((id): id is string => !!id)
         );
         const utilizationRate = totalCars > 0 ? (activeCarIds.size / totalCars) * 100 : 0;
 

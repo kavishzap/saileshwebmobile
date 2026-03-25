@@ -49,7 +49,11 @@ export function RecentContractsTable({ contracts }: RecentContractsTableProps) {
             customerName: customer
               ? `${customer.firstName} ${customer.lastName}`
               : "Unknown",
-            carName: car?.name || "Unknown",
+            carName: car
+              ? car.name
+              : contract.carId
+                ? "Unknown"
+                : "No vehicle",
           };
         })
       );

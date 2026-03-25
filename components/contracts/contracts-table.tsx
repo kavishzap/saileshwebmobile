@@ -129,24 +129,39 @@ export function ContractsTable({
       try {
         const enriched = await Promise.all(
           inputContracts.map(async (contract) => {
-            const [customer, car] = await Promise.all([
-              getCustomerById(contract.customerId),
-              getCarById(contract.carId),
-            ]);
+            try {
+              const [customer, car] = await Promise.all([
+                getCustomerById(contract.customerId),
+                getCarById(contract.carId),
+              ]);
 
-            const fullName = customer
-              ? `${customer.firstName} ${customer.lastName}`
-              : "Unknown";
+              const fullName = customer
+                ? `${customer.firstName} ${customer.lastName}`
+                : "Unknown";
 
-            return {
-              ...contract,
-              customerName: fullName,
-              customerAddress: customer?.address ?? null,
-              customerCity: customer?.city ?? null,
-              customerCountry: customer?.country ?? null,
-              carName: car?.name ?? "Unknown",
-              carPlateNumber: car?.plateNumber ?? "",
-            } as Enriched;
+              const carLabel = car
+                ? car.name
+                : contract.carId
+                  ? "Unknown"
+                  : "No vehicle";
+
+              return {
+                ...contract,
+                customerName: fullName,
+                customerAddress: customer?.address ?? null,
+                customerCity: customer?.city ?? null,
+                customerCountry: customer?.country ?? null,
+                carName: carLabel,
+                carPlateNumber: car?.plateNumber ?? "",
+              } as Enriched;
+            } catch (err) {
+              console.error("Failed to enrich contract row", contract.id, err);
+              return {
+                ...contract,
+                customerName: "—",
+                carName: "—",
+              } as Enriched;
+            }
           })
         );
         if (!cancelled) setRows(enriched);

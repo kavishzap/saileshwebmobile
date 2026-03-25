@@ -47,10 +47,10 @@ const localizer = dateFnsLocalizer({
 
 type PlannerEvent = RBCEvent & {
   contractId: string;
-  carId: string;
+  carId: string | null;
   customerId: string;
   status: Contract["status"];
-  carName?: string;
+  carLabel?: string;
   customerName?: string;
   isTerminating?: boolean;
 };
@@ -116,7 +116,8 @@ export default function ContractsPlannerPage() {
   }, [toast]);
 
   // Helper to get labels
-  const getCarLabel = (id: string) => {
+  const getCarLabel = (id: string | null | undefined) => {
+    if (id == null || id === "") return "No vehicle";
     const car = cars.find((c) => c.id === id);
     if (!car) return "Unknown car";
 

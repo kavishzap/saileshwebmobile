@@ -43,6 +43,9 @@ import { cn } from "@/lib/utils";
 // 🆕 booked dates service
 import { getCarBookedDateRanges } from "@/lib/services/contractAvailability";
 
+/** Sentinel for Radix Select when no vehicle is chosen (empty string is not a valid item value). */
+const NO_VEHICLE_SELECT_VALUE = "__no_vehicle__";
+
 type ContractDialogProps = {
   open: boolean;
   contract: Contract | null;
@@ -175,7 +178,7 @@ export function ContractDialog({
       
       setFormData({
         customerId: contract.customerId,
-        carId: contract.carId,
+        carId: contract.carId ?? "",
         startDate: contract.startDate.split("T")[0],
         endDate: contract.endDate.split("T")[0],
         dailyRate: contract.dailyRate,
@@ -372,11 +375,15 @@ export function ContractDialog({
     formData.cardPaymentPercent,
   ]);
 
-  const handleCarChange = (carId: string) => {
-    const selectedCar = cars.find((c) => c.id === carId);
+  const handleCarChange = (value: string) => {
+    if (value === NO_VEHICLE_SELECT_VALUE) {
+      setFormData((prev) => ({ ...prev, carId: "", dailyRate: 0 }));
+      return;
+    }
+    const selectedCar = cars.find((c) => c.id === value);
     setFormData((prev) => ({
       ...prev,
-      carId,
+      carId: value,
       dailyRate: selectedCar ? selectedCar.pricePerDay : 0,
     }));
     // bookedDates will be loaded by the effect that watches formData.carId
@@ -411,15 +418,15 @@ export function ContractDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.customerId || !formData.carId) {
+    if (!formData.customerId) {
       toast({
         title: "Error",
-        description: "Please select both a customer and a car.",
+        description: "Please select a customer.",
         variant: "destructive",
       });
       return;
     }
-    if (!isEditMode && formData.startDate && formData.endDate) {
+    if (!isEditMode && formData.carId && formData.startDate && formData.endDate) {
       const newStart = parseDateOnly(formData.startDate);
       const newEnd = parseDateOnly(formData.endDate);
 
@@ -454,7 +461,7 @@ export function ContractDialog({
 
       const base = {
         customerId: formData.customerId,
-        carId: formData.carId,
+        carId: formData.carId || null,
         startDate: new Date(formData.startDate).toISOString(),
         endDate: new Date(formData.endDate).toISOString(),
         dailyRate: formData.dailyRate,
@@ -563,11 +570,17 @@ export function ContractDialog({
 
             <div className="space-y-2">
               <Label htmlFor="carId">Car</Label>
-              <Select value={formData.carId} onValueChange={handleCarChange}>
+              <Select
+                value={formData.carId || NO_VEHICLE_SELECT_VALUE}
+                onValueChange={handleCarChange}
+              >
                 <SelectTrigger id="carId" className="w-full">
                   <SelectValue placeholder="Select car" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={NO_VEHICLE_SELECT_VALUE}>
+                    No vehicle
+                  </SelectItem>
                   {cars.map((c) => {
                     const details = [
                       c.brand,
